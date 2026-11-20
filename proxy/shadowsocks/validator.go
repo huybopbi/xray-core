@@ -71,6 +71,20 @@ func (v *Validator) initializeIfNeeded() {
 	}
 }
 
+// Close stops the attack-defense cleanup goroutine started for this validator.
+func (v *Validator) Close() error {
+	if v == nil {
+		return nil
+	}
+	v.Lock()
+	ad := v.attackDefense
+	v.Unlock()
+	if ad == nil {
+		return nil
+	}
+	return ad.Close()
+}
+
 // Add a Shadowsocks user.
 // 优化：支持高频添加场景（适用于逐个添加或定期同步）
 // - 自动预分配容量，减少内存重分配

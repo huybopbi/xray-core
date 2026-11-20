@@ -25,7 +25,6 @@ type Server struct {
 	config        *ServerConfig
 	validator     *Validator
 	policyManager policy.Manager
-	cone          bool
 }
 
 // NewServer create a new Shadowsocks server.
@@ -47,10 +46,20 @@ func NewServer(ctx context.Context, config *ServerConfig) (*Server, error) {
 		config:        config,
 		validator:     validator,
 		policyManager: v.GetFeature(policy.ManagerType()).(policy.Manager),
-		cone:          ctx.Value("cone").(bool),
 	}
 
 	return s, nil
+}
+
+var _ common.Closable = (*Server)(nil)
+
+// Close implements common.Closable. Inbound removal calls this so the
+// Shadowsocks attack-defense cleanup goroutine does not outlive the handler.
+func (s *Server) Close() error {
+	if s == nil || s.validator == nil {
+		return nil
+	}
+	return s.validator.Close()
 }
 
 // AddUser implements proxy.UserManager.AddUser().
@@ -189,7 +198,7 @@ func (s *Server) handleUDPPayload(ctx context.Context, conn stat.Connection, dis
 
 			data.UDP = &destination
 
-			if !s.cone || dest == nil {
+			if dest == nil {
 				dest = &destination
 			}
 
