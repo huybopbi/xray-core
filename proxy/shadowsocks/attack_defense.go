@@ -23,6 +23,9 @@ import (
 type AttackDefense struct {
 	shards [32]*defenseShardDB // 32个分片，降低锁竞争
 	config DefenseConfig
+	stop   chan struct{}
+	done   chan struct{}
+	once   sync.Once
 }
 
 // DefenseConfig 防御配置
@@ -80,6 +83,8 @@ func NewAttackDefense(config *DefenseConfig) *AttackDefense {
 
 	d := &AttackDefense{
 		config: *config,
+		stop:   make(chan struct{}),
+		done:   make(chan struct{}),
 	}
 
 	// 初始化32个分片
@@ -93,6 +98,16 @@ func NewAttackDefense(config *DefenseConfig) *AttackDefense {
 	go d.cleanupLoop()
 
 	return d
+}
+
+// Close stops cleanupLoop. It is safe to call more than once.
+func (d *AttackDefense) Close() error {
+	if d == nil {
+		return nil
+	}
+	d.once.Do(func() { close(d.stop) })
+	<-d.done
+	return nil
 }
 
 // CheckAllowed 检查IP是否被允许
@@ -405,14 +420,20 @@ func (d *AttackDefense) getShard(addr string) *defenseShardDB {
 	return d.shards[hash%32]
 }
 
-// cleanupLoop 定期清理过期记录
+// cleanupLoop 定期清理过期记录。Close 关闭 stop 后退出，避免入站关闭后协程泄漏。
 func (d *AttackDefense) cleanupLoop() {
 	ticker := time.NewTicker(d.config.CleanupInterval)
 	defer ticker.Stop()
+	defer close(d.done)
 
-	for range ticker.C {
-		d.cleanup()
-		d.cleanupWhitelist()
+	for {
+		select {
+		case <-d.stop:
+			return
+		case <-ticker.C:
+			d.cleanup()
+			d.cleanupWhitelist()
+		}
 	}
 }
 

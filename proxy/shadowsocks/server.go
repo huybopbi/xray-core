@@ -51,6 +51,17 @@ func NewServer(ctx context.Context, config *ServerConfig) (*Server, error) {
 	return s, nil
 }
 
+var _ common.Closable = (*Server)(nil)
+
+// Close implements common.Closable. Inbound removal calls this so the
+// Shadowsocks attack-defense cleanup goroutine does not outlive the handler.
+func (s *Server) Close() error {
+	if s == nil || s.validator == nil {
+		return nil
+	}
+	return s.validator.Close()
+}
+
 // AddUser implements proxy.UserManager.AddUser().
 func (s *Server) AddUser(ctx context.Context, u *protocol.MemoryUser) error {
 	return s.validator.Add(u)
