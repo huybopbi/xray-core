@@ -207,6 +207,7 @@ jobs:
           name: Xray-${{ env.ASSET_NAME }}
           path: |
             ./build_assets/*
+          retention-days: 1
 
       - name: Create ZIP archive
         if: github.event_name == 'release'
@@ -361,6 +362,7 @@ jobs:
           name: Xray-${{ env.ASSET_NAME }}
           path: |
             ./build_assets/*
+          retention-days: 1
 
       - name: Create ZIP archive
         if: github.event_name == 'release'
